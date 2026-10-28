@@ -10,10 +10,19 @@ from transformers import XCLIPModel
 from transformers import XCLIPProcessor
 
 
+def format_timestamp(seconds):
+    """Converts seconds into HH:MM:SS format."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
 def analyze_video_in_chunks(video_path,
                             custom_labels,
                             chunk_duration_sec=2.0,
-                            clip_len=8):
+                            clip_len=8,
+                            threshold=0.0):
     # 1. Load the Zero-Shot X-CLIP model ONCE for efficiency
     print("Loading model...")
     model_name = "microsoft/xclip-base-patch32"
@@ -66,21 +75,25 @@ def analyze_video_in_chunks(video_path,
             predicted_class = custom_labels[predicted_class_idx]
             confidence = probs[0][predicted_class_idx].item()
 
-            # Calculate timestamps for output
-            start_time = start_frame / fps
-            end_time = end_frame / fps
+            # 6. Apply threshold and record/print
+            if confidence >= threshold:
+                start_time = start_frame / fps
+                end_time = end_frame / fps
 
-            chunk_result = {
-                "start": start_time,
-                "end": end_time,
-                "action": predicted_class,
-                "confidence": confidence
-            }
-            results.append(chunk_result)
+                chunk_result = {
+                    "start": start_time,
+                    "end": end_time,
+                    "action": predicted_class,
+                    "confidence": confidence
+                }
+                results.append(chunk_result)
 
-            print(
-                f"[{start_time:05.2f}s - {end_time:05.2f}s] Action: {predicted_class} (Confidence: {confidence:.2%})"
-            )
+                start_str = format_timestamp(start_time)
+                end_str = format_timestamp(end_time)
+
+                print(
+                    f"[{start_str} - {end_str}] Action: {predicted_class} (Confidence: {confidence:.2%})"
+                )
             
     except KeyboardInterrupt:
         print("\n[!] Analysis interrupted by user. Stopping early...")
@@ -100,13 +113,17 @@ def main():
     parser.add_argument(
         "--labels",
         type=str,
-        default=default_labels_path, # <--- Update the default here
+        default=default_labels_path,
         help="Path to a text file containing one action label per line"
     )
     parser.add_argument("--chunk_duration",
                         type=float,
                         default=2.0,
                         help="Duration of each chunk in seconds (default: 2.0)")
+    parser.add_argument("--threshold",
+                        type=float,
+                        default=0.0,
+                        help="Minimum confidence threshold (0.0 to 1.0) to include a prediction (default: 0.0)")
 
     args = parser.parse_args()
 
@@ -131,7 +148,8 @@ def main():
     # Run the analysis using the arguments provided
     timeline = analyze_video_in_chunks(args.video,
                                        my_actions,
-                                       chunk_duration_sec=args.chunk_duration)
+                                       chunk_duration_sec=args.chunk_duration,
+                                       threshold=args.threshold)
 
 
 # Run the script
