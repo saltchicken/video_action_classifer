@@ -23,3 +23,6 @@ vac = "video_action_classifier.__main__:main"
 [tool.setuptools.packages.find]
 where = ["src"] # Added this so setuptools knows to look inside the src directory
 include = ["video_action_classifier*"]
+
+[tool.setuptools.package-data]
+video_action_classifier = ["*.txt"]

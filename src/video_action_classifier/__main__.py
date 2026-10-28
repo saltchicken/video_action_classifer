@@ -84,6 +84,10 @@ def analyze_video_in_chunks(video_path,
 
 
 def main():
+    # Find the directory where this __main__.py file lives
+    package_dir = os.path.dirname(os.path.abspath(__file__))
+    default_labels_path = os.path.join(package_dir, "labels.txt")
+
     # Set up argument parsing
     parser = argparse.ArgumentParser(
         description="Analyze video chunks for specific actions using X-CLIP.")
@@ -91,8 +95,8 @@ def main():
     parser.add_argument(
         "--labels",
         type=str,
-        default="labels.txt",
-        help="Path to a text file containing one action label per line (default: labels.txt)"
+        default=default_labels_path, # <--- Update the default here
+        help="Path to a text file containing one action label per line"
     )
     parser.add_argument("--chunk_duration",
                         type=float,
