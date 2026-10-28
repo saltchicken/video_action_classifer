@@ -83,8 +83,7 @@ def analyze_video_in_chunks(video_path,
     return results
 
 
-# Run the script
-if __name__ == "__main__":
+def main():
     # Set up argument parsing
     parser = argparse.ArgumentParser(
         description="Analyze video chunks for specific actions using X-CLIP.")
@@ -93,8 +92,7 @@ if __name__ == "__main__":
         "--labels",
         type=str,
         default="labels.txt",
-        help=
-        "Path to a text file containing one action label per line (default: labels.txt)"
+        help="Path to a text file containing one action label per line (default: labels.txt)"
     )
     parser.add_argument("--chunk_duration",
                         type=float,
@@ -125,3 +123,8 @@ if __name__ == "__main__":
     timeline = analyze_video_in_chunks(args.video,
                                        my_actions,
                                        chunk_duration_sec=args.chunk_duration)
+
+
+# Run the script
+if __name__ == "__main__":
+    main()

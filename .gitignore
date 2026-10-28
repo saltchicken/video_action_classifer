@@ -1,0 +1,4 @@
+*.egg-info
+*.txt
+*.mp4
+*__pycache__

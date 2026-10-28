@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video_action_classifier"
+version = "0.1.0"
+description = "A video action classifier using Zero-Shot X-CLIP"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "decord",
+    "numpy",
+    "torch",
+    "torchvision",
+    "transformers",
+]
+
+[project.scripts]
+# Changed from .main:main to .__main__:main to match your filename
+vac = "video_action_classifier.__main__:main" 
+
+[tool.setuptools.packages.find]
+where = ["src"] # Added this so setuptools knows to look inside the src directory
+include = ["video_action_classifier*"]
