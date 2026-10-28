@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 
 from decord import cpu
 from decord import VideoReader
@@ -34,51 +35,55 @@ def analyze_video_in_chunks(video_path,
     results = []
 
     # 3. Iterate through the video in chunks
-    for start_frame in range(0, total_frames, frames_per_chunk):
-        end_frame = min(start_frame + frames_per_chunk, total_frames)
+    try:
+        for start_frame in range(0, total_frames, frames_per_chunk):
+            end_frame = min(start_frame + frames_per_chunk, total_frames)
 
-        # Skip the last chunk if it's too small to extract the required clip_len (8 frames)
-        if end_frame - start_frame < clip_len:
-            continue
+            # Skip the last chunk if it's too small to extract the required clip_len (8 frames)
+            if end_frame - start_frame < clip_len:
+                continue
 
-        # Sample 'clip_len' (8) frames evenly across this specific chunk
-        indices = np.linspace(start_frame, end_frame - 1,
-                              num=clip_len).astype(np.int64)
-        frames = videoreader.get_batch(indices).asnumpy()
+            # Sample 'clip_len' (8) frames evenly across this specific chunk
+            indices = np.linspace(start_frame, end_frame - 1,
+                                  num=clip_len).astype(np.int64)
+            frames = videoreader.get_batch(indices).asnumpy()
 
-        # Preprocess both the chunk's frames AND your custom text labels
-        inputs = processor(text=custom_labels,
-                           videos=list(frames),
-                           return_tensors="pt",
-                           padding=True)
+            # Preprocess both the chunk's frames AND your custom text labels
+            inputs = processor(text=custom_labels,
+                               videos=list(frames),
+                               return_tensors="pt",
+                               padding=True)
 
-        # 4. Run inference for this chunk
-        with torch.no_grad():
-            outputs = model(**inputs)
+            # 4. Run inference for this chunk
+            with torch.no_grad():
+                outputs = model(**inputs)
 
-        # 5. Calculate probabilities
-        probs = outputs.logits_per_video.softmax(dim=1)
+            # 5. Calculate probabilities
+            probs = outputs.logits_per_video.softmax(dim=1)
 
-        # Get the highest probability prediction
-        predicted_class_idx = probs.argmax(-1).item()
-        predicted_class = custom_labels[predicted_class_idx]
-        confidence = probs[0][predicted_class_idx].item()
+            # Get the highest probability prediction
+            predicted_class_idx = probs.argmax(-1).item()
+            predicted_class = custom_labels[predicted_class_idx]
+            confidence = probs[0][predicted_class_idx].item()
 
-        # Calculate timestamps for output
-        start_time = start_frame / fps
-        end_time = end_frame / fps
+            # Calculate timestamps for output
+            start_time = start_frame / fps
+            end_time = end_frame / fps
 
-        chunk_result = {
-            "start": start_time,
-            "end": end_time,
-            "action": predicted_class,
-            "confidence": confidence
-        }
-        results.append(chunk_result)
+            chunk_result = {
+                "start": start_time,
+                "end": end_time,
+                "action": predicted_class,
+                "confidence": confidence
+            }
+            results.append(chunk_result)
 
-        print(
-            f"[{start_time:05.2f}s - {end_time:05.2f}s] Action: {predicted_class} (Confidence: {confidence:.2%})"
-        )
+            print(
+                f"[{start_time:05.2f}s - {end_time:05.2f}s] Action: {predicted_class} (Confidence: {confidence:.2%})"
+            )
+            
+    except KeyboardInterrupt:
+        print("\n[!] Analysis interrupted by user. Stopping early...")
 
     return results
 
@@ -131,4 +136,8 @@ def main():
 
 # Run the script
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[!] Script terminated by user.")
+        sys.exit(130)
