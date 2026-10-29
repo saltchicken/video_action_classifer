@@ -41,7 +41,8 @@ def analyze_video_in_chunks(video_path,
     print(f"Video FPS: {fps:.2f} | Total Frames: {total_frames}")
     print(f"Analyzing in {chunk_duration_sec}s chunks...\n")
 
-    results = []
+    grouped_results = []
+    current_group = None
 
     # 3. Iterate through the video in chunks
     try:
@@ -75,30 +76,61 @@ def analyze_video_in_chunks(video_path,
             predicted_class = custom_labels[predicted_class_idx]
             confidence = probs[0][predicted_class_idx].item()
 
-            # 6. Apply threshold and record/print
+            # 6. Group dynamically
             if confidence >= threshold:
                 start_time = start_frame / fps
                 end_time = end_frame / fps
 
-                chunk_result = {
-                    "start": start_time,
-                    "end": end_time,
-                    "action": predicted_class,
-                    "confidence": confidence
-                }
-                results.append(chunk_result)
+                if current_group is None:
+                    # Start the very first group
+                    current_group = {
+                        "start": start_time,
+                        "end": end_time,
+                        "action": predicted_class,
+                        "confidences": [confidence]
+                    }
+                else:
+                    # If same action and consecutive, extend the current group
+                    if predicted_class == current_group["action"] and abs(start_time - current_group["end"]) < 0.1:
+                        current_group["end"] = end_time
+                        current_group["confidences"].append(confidence)
+                    else:
+                        # Action changed! Print the completed group
+                        avg_conf = sum(current_group["confidences"]) / len(current_group["confidences"])
+                        start_str = format_timestamp(current_group["start"])
+                        end_str = format_timestamp(current_group["end"])
+                        
+                        # \r and ljust(80) ensures we overwrite the "Analyzing..." status line completely
+                        out_str = f"[{start_str} - {end_str}] Action: {current_group['action']} (Avg Confidence: {avg_conf:.2%})"
+                        print(f"\r{out_str.ljust(80)}")
+                        
+                        grouped_results.append(current_group)
+                        
+                        # Start a new group
+                        current_group = {
+                            "start": start_time,
+                            "end": end_time,
+                            "action": predicted_class,
+                            "confidences": [confidence]
+                        }
 
-                start_str = format_timestamp(start_time)
-                end_str = format_timestamp(end_time)
-
-                print(
-                    f"[{start_str} - {end_str}] Action: {predicted_class} (Confidence: {confidence:.2%})"
-                )
+            # 7. Print progress on the same line (Moved OUTSIDE the threshold check so it always updates)
+            current_end_time = end_frame / fps
+            print(f"Analyzing... current timestamp: {format_timestamp(current_end_time)}".ljust(80), end="\r", flush=True)
             
     except KeyboardInterrupt:
-        print("\n[!] Analysis interrupted by user. Stopping early...")
+        print("\n\n[!] Analysis interrupted by user. Stopping early...")
 
-    return results
+    # 8. When loop finishes (or is interrupted), print the final lingering group
+    if current_group is not None:
+        avg_conf = sum(current_group["confidences"]) / len(current_group["confidences"])
+        start_str = format_timestamp(current_group["start"])
+        end_str = format_timestamp(current_group["end"])
+        out_str = f"[{start_str} - {end_str}] Action: {current_group['action']} (Avg Confidence: {avg_conf:.2%})"
+        print(f"\r{out_str.ljust(80)}")
+        grouped_results.append(current_group)
+
+    return grouped_results
 
 
 def main():
@@ -150,6 +182,11 @@ def main():
                                        my_actions,
                                        chunk_duration_sec=args.chunk_duration,
                                        threshold=args.threshold)
+    
+    if not timeline:
+        print("\nNo actions found above the confidence threshold.")
+    else:
+        print("\nAnalysis complete.")
 
 
 # Run the script
